@@ -1,0 +1,40 @@
+name: Local launcher
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  launcher:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    env:
+      BO1_TEST_DOWNLOADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Windows bootstrap and runtime checks
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cmd /c Jogar.cmd --help
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & .runtime/uv.exe run --no-project --python 3.12 python -m unittest discover -s tests -v
+          exit $LASTEXITCODE
+      - name: Mac bootstrap and runtime checks
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          bash Jogar.command --help
+          uv=$(find .runtime -maxdepth 2 -type f -name uv | head -1)
+          "$uv" run --no-project --python 3.12 python -m unittest discover -s tests -v
+      - name: Windows clean installation and build
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cmd /c Jogar.cmd --setup-only
+          exit $LASTEXITCODE
