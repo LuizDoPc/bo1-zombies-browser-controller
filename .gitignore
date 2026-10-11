@@ -9,3 +9,8 @@
 /mp/node_modules/
 telemetry.jsonl
 __pycache__/
+*.log
+.DS_Store
+.env
+.env.*
+!.env.example

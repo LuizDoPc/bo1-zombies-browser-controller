@@ -1,4 +1,14 @@
-# bo1z co-op and fixes
+# BO1 Zombies no navegador — execução local com controle
+
+Fork de [kpwn/bo1z-mp](https://github.com/kpwn/bo1z-mp), com um iniciador local que escuta somente em `127.0.0.1` e instruções em português. O suporte a controle e os patches WebAssembly são do projeto original de **kpwn**.
+
+**Validado em 11/10/2026:** Kino der Toten carregado em uma partida local no Chrome/macOS; DualShock 4 reconhecido pela Gamepad API, com os eixos recebidos pelo motor e `gpad_enabled=1`. Isso não certifica todos os botões, mapas ou multiplayer.
+
+Veja [como instalar e iniciar localmente](docs/LOCAL-PT-BR.md). Este repositório contém código e ferramentas; os arquivos do jogo, os binários baixados, as configurações privadas e os logs não estão incluídos.
+
+---
+
+# bo1z co-op and fixes (documentação original)
 
 Changes to [BO1 Zombies](https://vel.gg/bo1z) (Black Ops zombies in the browser: the "Kisak Black" WebGPU + WASM
 engine), as a patch set that builds on a copy of the site:
@@ -157,4 +167,3 @@ its `<base href="/bo1z/">`, the only thing that tied the site to `/bo1z/`.
   hosts set those two headers in their config. GitHub Pages can't set headers, and the archive is far over its
   size limit anyway.
 - No telemetry endpoint: the client probes it, gets a 404 and turns telemetry off.
-
