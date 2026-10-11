@@ -353,10 +353,17 @@ export function startLobby({ manual = false } = {}) {
       dc.binaryType = 'arraybuffer';
       if (dc.label === 'lobby') {
         m.lobby = dc;
-        dc.onopen = () => { log(`peer ${pid} lobby open`); m.heard = performance.now(); tell(m, myState()); changed(); };
+        let announced = false;
+        dc.onopen = () => {
+          if (announced) return;
+          announced = true;
+          log(`peer ${pid} lobby open`); m.heard = performance.now(); tell(m, myState()); changed();
+        };
         dc.onmessage = e => { try { onLobbyMessage(m, JSON.parse(e.data)); } catch (err) { log('lobby message', err); } };
         // the other page closed or reloaded (a reload comes back with a new id)
         dc.onclose = () => gone(m);
+        // Remote channels may already be open when the datachannel event is delivered.
+        if (dc.readyState === 'open') dc.onopen();
       } else {
         m.game = dc;
         dc.onmessage = e => deliver(pid, e.data);

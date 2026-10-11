@@ -7,8 +7,9 @@
 // Run: node mp/build.mjs
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
-const MP = path.dirname(new URL(import.meta.url).pathname), ROOT = path.resolve(MP, '..');
+const MP = path.dirname(fileURLToPath(import.meta.url)), ROOT = path.resolve(MP, '..');
 const SITE = path.join(ROOT, 'site'), OUT = path.join(ROOT, 'overlay');
 execFileSync(process.execPath, ['--max-old-space-size=16000', path.join(MP, 'patch-wasm.mjs')], { stdio: 'inherit' });
 function patch(text, old, neu) {
@@ -139,8 +140,11 @@ fs.copyFileSync(path.join(MP, 'sw.js'), path.join(OUT, 'sw.js'));  // "Offline p
 fs.rmSync(path.join(OUT, 'coop-mod'), { recursive: true, force: true });
 fs.cpSync(path.join(MP, 'mods'), path.join(OUT, 'coop-mod'), { recursive: true });
 fs.mkdirSync(path.join(OUT, 'coop-mod/_stack/maps'), { recursive: true });
-for (const f of ['_modstack.gsc', '_zombiemode_ffotd.gsc'])
-  fs.copyFileSync(path.join(SITE, 'pack/mods/_stack/maps', f), path.join(OUT, 'coop-mod/_stack/maps', f));
+for (const f of ['_modstack.gsc', '_zombiemode_ffotd.gsc']) {
+  const source = ['kino/pack', 'pack'].map(p => path.join(SITE, p, 'mods/_stack/maps', f)).find(p => fs.existsSync(p));
+  if (!source) throw new Error('Baixe o pacote de Kino antes de preparar o jogo: ' + f);
+  fs.copyFileSync(source, path.join(OUT, 'coop-mod/_stack/maps', f));
+}
 // offline co-op codes (coop.js): QR drawing (qrcode-generator, MIT) and camera scanning (jsQR, Apache-2.0), loaded on use
 fs.mkdirSync(path.join(OUT, 'vendor'), { recursive: true });
 fs.copyFileSync(path.join(MP, 'node_modules/qrcode-generator/qrcode.js'), path.join(OUT, 'vendor/qrcode.js'));

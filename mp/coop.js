@@ -5,6 +5,7 @@
 // accident; after it, everyone's game connects to the host's and round 1 waits for all the players.
 import { startLobby } from './net.js';
 const query = new URLSearchParams(location.search);
+const localMode = query.get('local') === '1';
 const room = query.get('lobby') ?? query.get('host') ?? query.get('join');
 const mapName = document.querySelector('#game')?.getAttribute('aria-label') ?? document.title;
 const style = document.createElement('style');
@@ -110,7 +111,7 @@ const names = list => list.length <= 2 ? list.join(' and ') : `${list.slice(0, -
 Object.defineProperty(globalThis, '__kisakLandingPick', { configurable: true, get: () => false, set() {} });
 const playButton = document.getElementById('play');
 const onLanding = () => document.body.dataset.screen === 'landing';
-const PLAY_LABEL = room ? 'Get ready' : 'Play solo';
+const PLAY_LABEL = localMode ? (room ? 'Preparar meu jogo' : 'Jogar sozinho') : room ? 'Get ready' : 'Play solo';
 function relabel() {
   if (onLanding() && playButton?.textContent === 'Press any key to start') playButton.textContent = PLAY_LABEL;
 }
@@ -210,7 +211,7 @@ if (settingsBody) {
   const graphics = () => { applyGraphics(); applyLive(); };
   const done = el('button', { type: 'button', textContent: 'Done' });
   done.onclick = closeOptions;
-  settingsBody.prepend(el('div', { className: 'kb-opt-head' }, el('span', {}, 'Options'), done),
+  settingsBody.prepend(el('div', { className: 'kb-opt-head' }, el('span', {}, 'Opções'), done),
     el('h3', {}, 'All maps'),
     ...[document.getElementById('fullscreen')?.closest('label'),
       check('bo1z-lowgfx', 'Low graphics', 'Faster on slow machines: no dynamic shadows, lower texture detail, simpler distant models, lower render resolution. Shadows and models change right away; texture detail and resolution when the map starts.', graphics),
@@ -441,19 +442,19 @@ if (!room) {
   // "Play with friends" next to "Play solo" on the map page
   const friends = el('button', { id: 'coop-friends', className: 'option', type: 'button', textContent: 'Play with friends' });
   // online: create a lobby or join one by its code; offline: straight to a same-Wi-Fi lobby
-  friends.onclick = () => { if (offline) location.assign(pageUrl(newRoom())); else friendsPanel().show(); };
+  friends.onclick = () => { if (localMode) { location.assign('/jogar'); return; } if (offline) location.assign(pageUrl(newRoom())); else friendsPanel().show(); };
   document.querySelector('#overlay .actions')?.append(friends);
-  const sync = () => { friends.textContent = offline ? 'Play with friends (same Wi-Fi)' : 'Play with friends'; };
+  const sync = () => { friends.textContent = localMode ? 'Jogar na rede' : offline ? 'Play with friends (same Wi-Fi)' : 'Play with friends'; };
   offlineListeners.add(sync); sync();
 } else lobbyUi();
 // "Options" (the panel above) and "Map select" (back to the list of maps) beside the Play buttons; Map select only on
 // the start screen and outside a lobby (the lobby has "Leave lobby")
 {
   const actions = document.querySelector('#overlay .actions');
-  const optionsBtn = el('button', { id: 'kb-options', className: 'option', type: 'button', textContent: 'Options' });
+  const optionsBtn = el('button', { id: 'kb-options', className: 'option', type: 'button', textContent: 'Opções' });
   optionsBtn.onclick = () => { if (settings) settings.open = true; };
-  const mapsBtn = el('button', { id: 'kb-maps', className: 'option', type: 'button', textContent: 'Map select', hidden: !!room });
-  mapsBtn.onclick = () => location.assign(new URL('./', document.baseURI).href);
+  const mapsBtn = el('button', { id: 'kb-maps', className: 'option', type: 'button', textContent: 'Voltar ao início', hidden: !!room });
+  mapsBtn.onclick = () => location.assign(localMode ? '/jogar' : new URL('./', document.baseURI).href);
   if (settings) actions?.append(optionsBtn);
   actions?.append(mapsBtn);
 }
@@ -485,7 +486,7 @@ function friendsPanel() {
   const create = el('button', { type: 'button', className: 'kb-go', textContent: 'Create a lobby' });
   create.onclick = () => location.assign(pageUrl(newRoom()));
   const code = el('input', { placeholder: 'lobby code, e.g. kino-ab3k9xq2', spellcheck: false, autocapitalize: 'off', autocomplete: 'off' });
-  const join = el('button', { type: 'button', textContent: 'Join' });
+  const join = el('button', { type: 'button', textContent: 'Entrar' });
   const err = el('div', { className: 'kb-err' });
   const go = () => joinCode(code.value).catch(e => { err.textContent = e.message; });
   join.onclick = go;
@@ -537,39 +538,39 @@ async function lobbyUi() {
   copy.onclick = () => {
     linkBox.select();
     (navigator.clipboard?.writeText(link) ?? Promise.reject()).catch(() => document.execCommand('copy'));
-    copy.textContent = 'Copied!'; setTimeout(() => { copy.textContent = 'Copy invite link'; }, 2000);
+    copy.textContent = 'Copiado!'; setTimeout(() => { copy.textContent = 'Copy invite link'; }, 2000);
   };
-  const nameBox = el('input', { value: net.me.name, maxLength: 15, size: 14, placeholder: 'your name' });
+  const nameBox = el('input', { value: net.me.name, maxLength: 15, size: 14, placeholder: 'seu nome' });
   nameBox.onchange = () => { net.setName(nameBox.value); nameBox.value = net.me.name; };
   // typing a name must not reach the game's "press any key" prompt
   for (const t of ['keydown', 'keyup', 'keypress']) nameBox.addEventListener(t, e => { e.stopPropagation(); if (t === 'keydown' && e.key === 'Enter') nameBox.blur(); });
   // back to this map's start screen (Play solo / Play with friends)
-  const leave = el('button', { type: 'button', textContent: 'Leave lobby' });
-  leave.onclick = () => location.assign(pageUrl(null));
+  const leave = el('button', { type: 'button', textContent: 'Voltar ao início' });
+  leave.onclick = () => location.assign(localMode ? '/jogar' : pageUrl(null));
   const list = el('ul');
   const step = el('div', { className: 'step' });
   const startBtn = el('button', { type: 'button', className: 'go' });
   startBtn.onclick = () => { net.start(); render(); };
-  const waitBtn = el('button', { type: 'button', textContent: 'Start without them' });
+  const waitBtn = el('button', { type: 'button', textContent: 'Começar sem quem saiu' });
   waitBtn.onclick = () => net.startNow();
-  const backBtn = el('button', { type: 'button', className: 'go', textContent: 'Back to the lobby' });
+  const backBtn = el('button', { type: 'button', className: 'go', textContent: 'Voltar à sala' });
   backBtn.onclick = () => location.reload();
-  const soloBtn = el('button', { type: 'button', className: 'go', textContent: 'Play solo instead' });
+  const soloBtn = el('button', { type: 'button', className: 'go', textContent: 'Jogar sozinho' });
   soloBtn.onclick = () => location.assign(pageUrl(null));
   const status = el('div', { className: 'dim' });
   const code = await lobbyCode(net.room);
-  const copyCode = el('button', { type: 'button', textContent: 'Copy code' });
+  const copyCode = el('button', { type: 'button', textContent: 'Copiar código' });
   copyCode.onclick = () => {
     (navigator.clipboard?.writeText(code) ?? Promise.reject()).catch(() => {});
-    copyCode.textContent = 'Copied!'; setTimeout(() => { copyCode.textContent = 'Copy code'; }, 2000);
+    copyCode.textContent = 'Copiado!'; setTimeout(() => { copyCode.textContent = 'Copiar código'; }, 2000);
   };
   // the code, for friends who join from "Play with friends" (an installed app has no address bar)
   const codeRow = el('div', { className: 'row' }, el('span', { className: 'dim' }, 'Lobby code'), el('strong', { className: 'code' }, code), copyCode);
   const inviteRow = el('div', { className: 'row' }, linkBox, copy);
   const bar = el('div', { id: 'coop' },
-    el('h2', {}, el('span', {}, `Co-op lobby · ${mapName}`)),
+    el('h2', {}, el('span', {}, `Partida na rede · ${mapName}`)),
     inviteRow, codeRow,
-    el('div', { className: 'row' }, el('span', { className: 'dim' }, 'Your name'), nameBox),
+    el('div', { className: 'row' }, el('span', { className: 'dim' }, 'Seu nome'), nameBox),
     list, step,
     el('div', { className: 'row' }, startBtn, waitBtn, backBtn, soloBtn, leave),
     status);
@@ -579,8 +580,8 @@ async function lobbyUi() {
   const lan = net.manual ? lanPanel(net) : null;
   if (lan) { bar.insertBefore(lan.box, list); bar.classList.add('wide'); }
 
-  const SCREEN = { landing: ['in the lobby', ''], download: ['downloading…', ''], loading: ['loading…', ''], ready: ['ready', 'ok'],
-    playing: ['in game', 'ok'], error: ['game stopped', ''] };
+  const SCREEN = { landing: ['na sala', ''], download: ['baixando…', ''], loading: ['carregando…', ''], ready: ['pronto', 'ok'],
+    playing: ['jogando', 'ok'], error: ['jogo interrompido', ''] };
   const play = document.getElementById('play');
   let held = null;  // the Play button's label while the lobby holds "Click to start"
   let lastHostName = 'The host';  // remembered for "… left the game"
@@ -599,13 +600,13 @@ async function lobbyUi() {
     list.replaceChildren(...people.map((p, i) => {
       const [label, cls] = i >= max && !started?.players.includes(p.id) ? ['lobby full', ''] : SCREEN[p.screen] ?? [p.screen ?? '', ''];
       // the host can remove a player before the start (someone who never gets ready would hold the start forever)
-      const remove = iAmHost && !started && p.id !== net.me.id ? el('button', { type: 'button', className: 'rm', textContent: 'Remove', title: `Remove ${p.name} from the lobby` }) : '';
+      const remove = iAmHost && !started && p.id !== net.me.id ? el('button', { type: 'button', className: 'rm', textContent: 'Remover', title: `Remove ${p.name} from the lobby` }) : '';
       if (remove) remove.onclick = () => net.kick(p.id);
       // and hand hosting to them (online lobbies: offline, the others are only connected to the current host)
       const promote = remove && !net.manual ? el('button', { type: 'button', className: 'rm', textContent: 'Make host', title: `${p.name} hosts the game instead of you` }) : '';
       if (promote) promote.onclick = () => net.makeHost(p.id);
       return el('li', {},
-        el('span', {}, `${p.id === host ? '★ ' : ''}${p.name}${p.id === net.me.id ? ' (you)' : ''}${p.id === host ? ' · host' : ''}`),
+        el('span', {}, `${p.id === host ? '★ ' : ''}${p.name}${p.id === net.me.id ? ' (você)' : ''}${p.id === host ? ' · criou a partida' : ''}`),
         el('span', { className: 'right' }, el('span', { className: `st ${cls}` }, label), promote, remove));
     }));
     if (!people.length) list.replaceChildren(el('li', {}, el('span', { className: 'st' }, 'Joining the lobby…')));
@@ -634,6 +635,18 @@ async function lobbyUi() {
     else if (screen === 'ready') { text = 'Starting…'; big = true; }
     else if (screen === 'download' || screen === 'loading') text = 'The game has started: it will join as soon as the map has loaded.';
     else if (!started.players.includes(net.me.id)) text = 'You joined a game in progress: you spawn at the next round.';
+    if (localMode && net.manual) {
+      if (net.removed) text = 'Você foi removido desta sala.';
+      else if (net.hostLeft) text = 'Quem criou a partida saiu. Volte ao início para jogar novamente.';
+      else if (screen === 'error') text = 'O jogo parou. Volte à sala para tentar novamente.';
+      else if (full) text = 'Esta sala está cheia.';
+      else if (!started && people.length < 2) text = 'Conectem pelo convite e pela resposta acima. Depois, os dois clicam em Preparar meu jogo.';
+      else if (!started && screen === 'landing') text = 'Amigo conectado! Clique em Preparar meu jogo, abaixo.';
+      else if (!started && !meReady) text = 'Preparando o mapa. Aguarde; a primeira abertura demora um pouco.';
+      else if (!started && iAmHost) text = notReady.length ? 'Aguardando seu amigo terminar de carregar.' : 'Todos prontos! Clique em Começar partida.';
+      else if (!started) text = 'Pronto! Aguardando seu amigo começar a partida.';
+      else if (screen !== 'playing') text = 'Entrando na partida…';
+    }
     step.textContent = text; step.className = big ? 'step big' : 'step'; step.hidden = !text;
 
     inviteRow.hidden = codeRow.hidden = full || net.hostLeft || offline || net.manual || net.removed;
@@ -641,15 +654,16 @@ async function lobbyUi() {
     startBtn.hidden = !iAmHost || !!started || full || (offline && !net.manual) || net.removed;
     // Start only once everyone (the host too) is ready
     startBtn.disabled = !net.canStart();
-    startBtn.textContent = !meReady ? 'Start (get ready first)' : notReady.length ? `Start (waiting for ${plural(notReady.length, 'player')})`
-      : able.length < 2 ? 'Start alone' : `Start (${plural(able.length, 'player')})`;
+    startBtn.textContent = !meReady ? 'Prepare seu jogo primeiro' : notReady.length ? `Start (waiting for ${plural(notReady.length, 'player')})`
+      : able.length < 2 ? 'Começar sozinho' : `Start (${plural(able.length, 'player')})`;
+    if (localMode && meReady) startBtn.textContent = notReady.length ? 'Aguardando o amigo ficar pronto' : `Começar partida (${able.length} jogadores)`;
     leave.hidden = !!net.removed;
     const waiting = started && net.isHost() && !net.waitedEnough && !net.hostLeft ? started.players.length - net.expected() : 0;
     const missing = started && net.isHost() ? started.players.filter(p => p !== net.me.id && !net.members.get(p)?.lobby) : [];
     waitBtn.hidden = !(started && net.isHost() && missing.length && !net.waitedEnough);
     backBtn.hidden = !net.hostLeft && screen !== 'error';
     status.className = net.signalError ? 'warn' : 'dim';
-    status.textContent = net.manual && connecting ? (lan.role === 'joiner' ? 'Waiting for the host to use your reply…' : 'Waiting for their reply…')
+    status.textContent = net.manual && connecting ? (lan.role === 'joiner' ? 'Aguardando seu amigo colar a resposta e clicar em Conectar…' : 'Aguardando a resposta do amigo…')
       : net.signalError === 'not-configured' ? 'This site has no lobby service set up (net-config.json), so online lobbies can\'t connect.'
       : net.signalError ? `Can't reach the lobby service right now (${net.signalError}); retrying…`
       : connecting ? `Connecting to ${plural(connecting, 'player')}…`
@@ -662,7 +676,7 @@ async function lobbyUi() {
     // hold "Click to start" until the host starts, so nobody begins a solo game
     if (screen === 'ready' && (!started || full) && play && !play.hidden) {
       if (held == null) held = play.textContent;
-      play.disabled = true; play.textContent = full ? 'Lobby full' : net.hostId() === net.me.id ? 'Press Start above' : 'Waiting for the host';
+      play.disabled = true; play.textContent = full ? 'Sala cheia' : net.hostId() === net.me.id ? 'Aguarde e comece pelo botão da sala' : 'Aguardando quem criou a partida';
     } else if (held != null) {
       if (screen === 'ready') { play.disabled = false; play.textContent = held; }
       held = null;
@@ -740,12 +754,12 @@ function lanPanel(net) {
     #coop-scan .dim { color: #ccc; font: 15px system-ui, sans-serif; }`;
   document.head.append(extra);
   const err = el('div', { className: 'err' });
-  const fail = e => { err.textContent = e.page ? `${e.message}: open that map, then use the invite there.` : (e.message || String(e)); };
+  const fail = e => { err.textContent = localMode ? (e.page ? 'Esse convite é de outro mapa. Os dois precisam abrir Kino.' : 'Não foi possível conectar: copie o código inteiro e tente novamente. ' + (e.message || '')) : e.page ? `${e.message}: open that map, then use the invite there.` : (e.message || String(e)); };
   const codeBlock = () => {
     const canvas = el('canvas'), box = el('input', { className: 'link', readOnly: true });
     box.onfocus = () => box.select();
-    const copy = el('button', { type: 'button', textContent: 'Copy code' });
-    copy.onclick = () => { box.select(); (navigator.clipboard?.writeText(box.value) ?? Promise.reject()).catch(() => document.execCommand('copy')); copy.textContent = 'Copied!'; setTimeout(() => { copy.textContent = 'Copy code'; }, 2000); };
+    const copy = el('button', { type: 'button', textContent: 'Copiar código' });
+    copy.onclick = () => { box.select(); (navigator.clipboard?.writeText(box.value) ?? Promise.reject()).catch(() => document.execCommand('copy')); copy.textContent = 'Copiado!'; setTimeout(() => { copy.textContent = 'Copiar código'; }, 2000); };
     // the QR code on the left, the steps on the right
     const pair = (...steps) => el('div', { className: 'pair' }, canvas, el('div', {}, ...steps));
     return { row: el('div', { className: 'row' }, box, copy), pair, async show(code) { box.value = code; await drawQr(canvas, code).catch(fail); } };
@@ -756,20 +770,20 @@ function lanPanel(net) {
     const run = async text => { err.textContent = ''; use.disabled = true; try { await go(text.trim()); box.value = ''; } catch (e) { fail(e); } finally { use.disabled = false; } };
     use.onclick = () => run(box.value);
     box.addEventListener('keydown', e => { if (e.key === 'Enter') run(box.value); });
-    const scan = el('button', { type: 'button', textContent: 'Scan' });
+    const scan = el('button', { type: 'button', textContent: 'Ler QR' });
     scan.hidden = !navigator.mediaDevices?.getUserMedia;
     scan.onclick = async () => { err.textContent = ''; try { const t = await scanQr(); if (t) await run(t); } catch (e) { fail(e); } };
     return el('div', { className: 'row' }, box, scan, use);
   };
-  const state = { role: null };
+  const state = { role: localMode && query.get('localRole') === 'join' ? 'joiner' : null };
   // the host: one open invite at a time
   const inviteCode = codeBlock();
-  const inviteBtn = el('button', { type: 'button', className: 'go', textContent: 'Invite a player' });
+  const inviteBtn = el('button', { type: 'button', className: 'go', textContent: 'Criar convite' });
   const inviteStep = el('div', { className: 'lan', hidden: true }, inviteCode.pair(
-    el('div', { className: 'dim' }, '1. The other player opens this map, chooses “Play with friends (same Wi-Fi)”, and scans this invite (or pastes the code).'),
+    el('div', { className: 'dim' }, '1. Copie o convite e envie ao amigo. Ele deve escolher Entrar na partida de um amigo e colar o código.'),
     inviteCode.row,
-    el('div', { className: 'dim' }, '2. Then scan or paste their reply:'),
-    input('reply code', async code => { await net.useCode(code); inviteStep.hidden = true; }, 'Connect')));
+    el('div', { className: 'dim' }, '2. Seu amigo vai devolver uma resposta. Cole aqui para conectar:'),
+    input('Cole aqui a resposta do amigo', async code => { await net.useCode(code); inviteStep.hidden = true; }, 'Conectar')));
   inviteBtn.onclick = async () => {
     err.textContent = ''; inviteBtn.disabled = true;
     try { state.role = 'host'; const code = await net.invite(); inviteStep.hidden = false; await inviteCode.show(code); }
@@ -779,19 +793,20 @@ function lanPanel(net) {
   // an invited player: use the invite, show the reply
   const replyCode = codeBlock();
   const replyStep = el('div', { className: 'lan', hidden: true }, replyCode.pair(
-    el('div', { className: 'dim' }, 'Show this reply to the host: they scan it, or paste the code.'), replyCode.row));
+    el('div', { className: 'dim' }, 'Copie esta resposta e envie para quem criou a partida. Essa pessoa precisa colar a resposta e clicar em Conectar.'), replyCode.row));
   const joinPart = el('div', { className: 'lan' },
-    el('div', { className: 'dim' }, 'Invited? Scan or paste the invite:'),
-    input('invite code', async code => { const reply = await net.useCode(code); state.role = 'joiner'; replyStep.hidden = false; await replyCode.show(reply); }, 'Join'),
+    el('div', { className: 'dim' }, 'Cole o convite que seu amigo enviou ou leia o QR da tela dele:'),
+    input('Cole aqui o convite do amigo', async code => { const reply = await net.useCode(code); state.role = 'joiner'; replyStep.hidden = false; await replyCode.show(reply); }, 'Entrar'),
     replyStep);
   const box = el('div', { className: 'lan' }, hostPart, joinPart, err);
+  if (localMode && query.get('localRole') === 'host') setTimeout(() => inviteBtn.click(), 0);
   return {
     box,
     get role() { return state.role; },
     render(full) {
       const connected = [...net.members.values()].some(m => m.lobby?.readyState === 'open');
       hostPart.hidden = state.role === 'joiner' || full || !!net.hostLeft || (connected && net.hostId() !== net.me.id);
-      inviteBtn.textContent = net.openInvite ? 'New invite' : connected ? 'Invite another player' : 'Invite a player';
+      inviteBtn.textContent = net.openInvite ? 'Criar novo convite' : connected ? 'Convidar outro amigo' : 'Criar convite';
       if (!net.openInvite) inviteStep.hidden = true;
       // once someone is connected, this page's role is settled
       joinPart.hidden = state.role === 'host' || (connected && state.role !== 'joiner') || (state.role === 'joiner' && connected);

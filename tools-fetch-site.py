@@ -3,7 +3,7 @@
 # loading videos and the map manifests, by following every reference from the map pages. The game data packs are a
 # separate download (tools-fetch-packs.py, which reads the manifests this writes). Re-run to refresh: files are
 # overwritten with the live copies. Usage: tools-fetch-site.py [--base URL] [--out DIR]
-import argparse, collections, os, re, sys, urllib.request
+import argparse, collections, os, posixpath, re, sys, urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ap = argparse.ArgumentParser()
@@ -19,7 +19,7 @@ def add(rel):
     if not rel or rel.startswith(('data:', 'http:', 'https:', '//', 'blob:', 'mailto:')): return
     rel = rel.lstrip('/')
     if rel.startswith('bo1z/'): rel = rel[5:]
-    rel = os.path.normpath(rel)
+    rel = posixpath.normpath(rel)
     if rel.startswith('..') or rel == '.' or '/pack/' in '/' + rel + '/': return  # packs: tools-fetch-packs.py
     if rel not in seen: seen.add(rel); queue.append(rel)
 
@@ -75,10 +75,10 @@ while queue:
     with open(path, 'wb') as f: f.write(data)
     print(f'{len(data):>10}  {rel}')
     if any(t in ctype for t in ('html', 'javascript', 'css', 'json')) and len(data) < 20_000_000:
-        text, d = data.decode('utf-8', 'replace'), os.path.dirname(rel)
+        text, d = data.decode('utf-8', 'replace'), posixpath.dirname(rel)
         for pat in REFS:
             for m in pat.findall(text):
-                add(os.path.join(d, m) if m.startswith(('./', '../')) else m)
+                add(posixpath.join(d, m) if m.startswith(('./', '../')) else m)
 
 # references the crawl guesses from code but the site doesn't have (optional files, string fragments) end up here;
 # the engine itself (artifacts/KisakBlack-web.*), the pages and the manifests must not

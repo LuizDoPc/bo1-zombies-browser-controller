@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="pt-BR">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BO1 Zombies · Jogar</title>
+<style>
+  *{box-sizing:border-box}body{margin:0;background:#10100f;color:#f5f2e9;font:16px/1.5 system-ui,sans-serif;min-height:100vh}
+  main{max-width:1120px;margin:auto;padding:64px 32px}header{display:flex;justify-content:space-between;gap:20px;align-items:center;border-bottom:1px solid #43413a;padding-bottom:20px}
+  .label{font-size:12px;letter-spacing:.15em;text-transform:uppercase;color:#b9b5a9}.online{color:#c3d6ae;font-size:13px}
+  .layout{display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:center;padding:60px 0}h1{font-size:clamp(44px,6vw,76px);line-height:.97;letter-spacing:-.045em;margin:18px 0 24px}h2{font-size:25px;margin:0 0 10px}
+  p{color:#c0bcb1;margin:12px 0 24px}.map{width:100%;aspect-ratio:16/10;object-fit:cover;border:1px solid #43413a;display:block}.caption{margin-top:12px;display:flex;justify-content:space-between;font-size:13px;color:#b9b5a9}
+  label{display:block;margin-bottom:7px;font-size:14px}input{background:#1b1b19;color:#fff;border:1px solid #676257;padding:13px;width:100%;font:inherit;border-radius:3px}
+  .actions{display:grid;gap:10px;margin-top:24px}button{background:transparent;border:1px solid #676257;color:#f5f2e9;padding:16px 18px;text-align:left;font:600 16px system-ui;cursor:pointer;border-radius:3px}button:first-child{background:#e1d2af;color:#171712;border-color:#e1d2af}
+  button:hover{border-color:#fff}button:focus-visible,input:focus-visible{outline:3px solid #db9d53;outline-offset:3px}
+  details{border-top:1px solid #43413a;padding:24px 0}summary{cursor:pointer;font-weight:600}ol{padding-left:22px;color:#c0bcb1;max-width:760px}li{margin:10px 0}footer{font-size:12px;color:#8c877b;padding-top:20px}#pad{font-size:13px;color:#c3d6ae;min-height:20px}#error{color:#ffb4a1}
+  @media(max-width:760px){main{padding:24px}.layout{grid-template-columns:1fr;gap:32px;padding:32px 0}.picture{order:-1}.map{aspect-ratio:2.2}h1{font-size:48px}header{align-items:start}}
+</style>
+<main>
+  <header><span class="label">Black Ops · Zombies</span><span class="online">Instalado neste computador</span></header>
+  <div class="layout">
+    <section><span class="label">Kino der Toten</span><h1>MAIS UMA<br>RODADA.</h1><p>Sozinho ou com um amigo na mesma rede.<br>Controle, teclado e mouse prontos para usar.</p>
+      <label for="name">Como você quer aparecer na partida?</label><input id="name" maxlength="15" placeholder="Seu nome" autocomplete="nickname">
+      <div class="actions"><button id="solo">Jogar sozinho →</button><button id="host">Criar partida na rede</button><button id="join">Entrar na partida de um amigo</button></div>
+      <p id="pad">Conecte o controle e pressione um botão para reconhecê-lo.</p><p id="error" role="alert" hidden></p>
+    </section>
+    <section class="picture"><img class="map" src="/bo1z/art/loadscreen_zombie_theater.webp" alt="Kino der Toten"><div class="caption"><span>01 / KINO DER TOTEN</span><span>SOLO + COOPERATIVO</span></div></section>
+  </div>
+  <details><summary>Como jogar juntos</summary><ol>
+    <li>Os dois abrem o iniciador no próprio computador e se conectam ao mesmo Wi-Fi ou à mesma rede por cabo.</li>
+    <li>Um escolhe <strong>Criar partida na rede</strong> e copia o convite. O outro escolhe <strong>Entrar na partida de um amigo</strong> e cola esse convite.</li>
+    <li>Quem entrou devolve o código de resposta. Quem criou cola a resposta e aperta <strong>Conectar</strong>. Vocês também podem ler os códigos QR com a câmera.</li>
+    <li>Os dois apertam <strong>Preparar meu jogo</strong>. Quando ambos estiverem prontos, quem criou aperta <strong>Começar partida</strong>.</li>
+  </ol><p>O cooperativo ainda é experimental. Se não conectar, confirme que nenhum dos computadores está na rede de convidados e que o navegador pode se comunicar na rede privada.</p></details>
+  <details><summary>Controle e primeira abertura</summary><p>Analógico esquerdo: andar. Direito: olhar. R2/RT: atirar. L2/LT: mirar. Quadrado/X: usar e recarregar. Options/Start: pausar.</p><p>Na primeira partida o navegador prepara os arquivos e os gráficos. Aguarde o carregamento. Mantenha a janela do iniciador aberta enquanto joga.</p></details>
+  <footer>Jogo: Treyarch / Activision · Port web: vel.gg · Patches de controle e cooperativo: kpwn</footer>
+</main>
+<script>
+  const nameBox=document.getElementById('name');
+  try{nameBox.value=localStorage.getItem('bo1z-name')||''}catch{}
+  function play(role){
+    const clean=nameBox.value.replace(/[^\w .-]/g,'').trim().slice(0,15);
+    try{localStorage.setItem('bo1z-name',clean)}catch{}
+    const url=new URL('/bo1z/kino',location.origin);url.searchParams.set('local','1');
+    if(role){url.searchParams.set('signal','manual');url.searchParams.set('lobby',Array.from(crypto.getRandomValues(new Uint8Array(8)),v=>'abcdefghijkmnpqrstuvwxyz23456789'[v&31]).join(''));url.searchParams.set('localRole',role)}
+    location.assign(url);
+  }
+  document.getElementById('solo').onclick=()=>play(null);
+  document.getElementById('host').onclick=()=>play('host');
+  document.getElementById('join').onclick=()=>play('join');
+  // Keep the launch menu usable with the same standard controller as the game.
+  const controls=[...document.querySelectorAll('.actions button')];let lastA=true,lastDirection=0,nextMove=0;
+  setInterval(()=>{
+    let pad;try{pad=[...(navigator.getGamepads?.()||[])].find(p=>p?.connected)}catch{}
+    if(!pad)return;
+    document.getElementById('pad').textContent='Controle conectado: '+pad.id;
+    if(document.activeElement===nameBox)return;
+    const dir=(pad.buttons[13]?.pressed||pad.axes[1]>.5)?1:(pad.buttons[12]?.pressed||pad.axes[1]<-.5)?-1:0;
+    const now=performance.now(),a=!!pad.buttons[0]?.pressed;
+    if(dir&&(!lastDirection||now>=nextMove)){const i=controls.indexOf(document.activeElement);controls[(i<0?0:(i+dir+controls.length)%controls.length)].focus();nextMove=now+(lastDirection?160:400)}
+    if(a&&!lastA&&controls.includes(document.activeElement))document.activeElement.click();
+    lastA=a;lastDirection=dir;
+  },80);
+</script>
+</html>
