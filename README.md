@@ -27,14 +27,18 @@ upstream's loader and page code, so a patch stops with "patch no longer applies"
 
 ## Building
 
-    site/                         # a copy of the site as served under /bo1z/ (tools-fetch-packs.py mirrors one)
+**Full walkthrough, from downloading upstream to a running server, and how to change things: [`docs/DEPLOY.md`](docs/DEPLOY.md).**
+In short:
+
+    python3 tools-fetch-site.py   # upstream's pages, scripts and engine into site/
+    python3 tools-fetch-packs.py  # the map packs (~9.2 GB)
     cd mp && npm ci && cd ..      # binaryen (wasm patching), qrcode-generator, jsqr
     cp mp/net-config.example.json mp/net-config.json   # then fill in your keys (or leave it out: no online lobbies)
     node mp/build.mjs             # writes overlay/: the patched engine and loader, plus the co-op files
     python3 serve.py              # local server, http://localhost:8000/bo1z/ (serves overlay/ over site/)
     python3 tools-make-static.py  # or: static/, a copy for any static host (docs/deploy-update.txt)
 
-Deployment notes are in `docs/`:
+More deployment notes are in `docs/`:
 - nginx headers (`nginx-coop-coep.conf`);
 - self-hosted signaling, ntfy and TURN (`*-setup.txt`);
 - telemetry (`telemetry-setup.txt`);

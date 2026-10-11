@@ -2,7 +2,7 @@
 # Archives every map pack of https://vel.gg/bo1z into site/<root>pack/<path> as the original (decoded) files.
 # Brotli transport parts are fetched from the R2 CDN (which serves them decoded) and concatenated; every file is
 # SHA-256-checked against its manifest. Opus entries also keep their .kop container (<path>.kop). Re-run to resume.
-import json, os, hashlib, urllib.request, urllib.parse, sys, threading, time
+import json, os, hashlib, urllib.request, urllib.error, urllib.parse, sys, threading, time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 SITE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'site')
 SLUGS = ['five', 'kino', 'riese', 'nacht', 'verruckt', 'shinonuma', 'ascension', 'cotd', 'shangrila', 'moon']
@@ -76,7 +76,23 @@ def jobs():
                 out[(slug, s['path'], '')] = (s['size'], s['sha256'], None)
     return out
 
+def horde_manifests():
+    """Hell mode (horde): maps that have it ship an extra pack manifest, pack/web-manifest-horde.json, which the map
+    manifests don't list; fetch it first so jobs() includes its files (a 404 means the map has no horde mode)."""
+    for slug in SLUGS:
+        root = '' if slug == 'five' else slug + '/'
+        dest = os.path.join(SITE, root + 'pack', 'web-manifest-horde.json')
+        try:
+            with urllib.request.urlopen(urllib.request.Request(f'https://cdn.vel.gg/packs/{slug}/web-manifest-horde.json', headers=UA), timeout=60) as r:
+                data = r.read()
+        except urllib.error.HTTPError as e:
+            if e.code == 404: continue
+            raise
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        with open(dest, 'wb') as f: f.write(data)
+
 if __name__ == '__main__':
+    horde_manifests()
     J = jobs()
     total = sum(v[0] for v in J.values())
     print(f'{len(J)} files, {total/1e9:.2f} GB', flush=True)
