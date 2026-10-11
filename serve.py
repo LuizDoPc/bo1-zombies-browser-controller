@@ -207,7 +207,7 @@ signal_topics, signal_cond, signal_seq = {}, threading.Condition(), [0]
 
 def patched(full):
     # the same patch table applies whether the file comes from overlay/ or site/
-    rel = os.path.relpath(full, OVERLAY if full.startswith(OVERLAY + os.sep) else SITE)
+    rel = os.path.relpath(full, OVERLAY if full.startswith(OVERLAY + os.sep) else SITE).replace(os.sep, '/')
     if rel not in PATCHES: return None
     raw = open(full, 'rb').read()
     try: text, encoding = raw.decode('utf-8'), 'utf-8'
@@ -231,7 +231,9 @@ class H(BaseHTTPRequestHandler):
     def resolve(self, path):
         if path in ('/', '/bo1z'): return 'redirect'
         if not path.startswith(PREFIX): return None
-        rel = os.path.normpath(unquote(path[len(PREFIX):]) or 'index.html').lstrip('/')
+        raw = unquote(path[len(PREFIX):])
+        if '\\' in raw or ':' in raw: return None  # Windows drive/UNC paths are not URLs in the game tree
+        rel = os.path.normpath(raw or 'index.html').lstrip('/')
         if rel.startswith('..'): return None
         full = os.path.join(OVERLAY, rel)
         if not os.path.isfile(full): full = os.path.join(SITE, rel)

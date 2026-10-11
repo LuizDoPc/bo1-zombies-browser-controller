@@ -7,6 +7,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 import launcher
+import serve
 
 
 class LauncherTests(unittest.TestCase):
@@ -41,6 +42,22 @@ class LauncherTests(unittest.TestCase):
             pack.unlink()
             self.assertFalse(launcher.inventory_valid({'pack.bin': 8}))
             self.assertFalse(launcher.inventory_valid({}))
+
+    def test_nested_engine_patches_use_portable_paths(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            script = root / 'artifacts' / 'test.js'
+            script.parent.mkdir()
+            script.write_bytes(b'before')
+            with patch.object(serve, 'SITE', folder), patch.object(serve, 'OVERLAY', str(root / 'overlay')):
+                with patch.object(serve, 'PATCHES', {'artifacts/test.js': [('before', 'after')]}):
+                    self.assertEqual(serve.patched(str(script)), b'after')
+
+    def test_windows_absolute_paths_are_not_served(self):
+        handler = object.__new__(serve.H)
+        self.assertIsNone(handler.resolve('/bo1z/C:/Windows/win.ini'))
+        self.assertIsNone(handler.resolve('/bo1z/%5C%5Cserver%5Cfile'))
+        self.assertIsNone(handler.resolve('/bo1z/../launcher.py'))
 
     def test_lock_released_after_failure(self):
         with tempfile.TemporaryDirectory() as folder, patch.object(launcher, 'ROOT', Path(folder)):
