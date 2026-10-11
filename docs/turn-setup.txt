@@ -1,0 +1,25 @@
+# A TURN relay for bo1z co-op, on your own server (coturn). Only needed when players can't connect directly.
+# Replace YOUR.SERVER.IP, the user name and the password.
+
+sudo apt install coturn
+
+# /etc/turnserver.conf
+listening-port=3478
+external-ip=YOUR.SERVER.IP
+realm=bo1z
+lt-cred-mech
+user=bo1z:CHANGE_THIS_PASSWORD
+fingerprint
+no-cli
+min-port=49160
+max-port=49200
+
+sudo systemctl enable --now coturn
+# open UDP+TCP 3478 and UDP 49160-49200 in the firewall
+
+# Then either add it to both URLs (host and joiner):
+#   ?host=...&turn=turn:YOUR.SERVER.IP:3478&turnuser=bo1z&turnpass=CHANGE_THIS_PASSWORD
+# or make it the default, in net-config.json (mp/net-config.json, or the copy on the server):
+#   "turn": { "urls": "turn:YOUR.SERVER.IP:3478", "username": "bo1z", "credential": "CHANGE_THIS_PASSWORD" }
+# and rebuild (deploy-update.txt). The password ends up in public page source either way; coturn only relays, so
+# the risk is people using your bandwidth.

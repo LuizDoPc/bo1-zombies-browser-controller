@@ -1,0 +1,27 @@
+# Safari Technology Preview (WebGPU), Five, at the desk.
+# Known: sun-shadow patches are fixed by proxyAlways=1 (cache bug; an agent is fixing the cache properly).
+# Remaining: couches, Mystery Box, spotlights (light where it shouldn't be, flickering).
+# Every line keeps proxyAlways=1 so the sun-shadow artifacts don't hide what changes. Note which line makes the
+# couches/box/spotlight problem go away or change.
+
+# 1. Spotlight shadow maps off (the earlier test of this was masked by the sun-shadow artifacts).
+/bo1z/five.html?proxyAlways=1&cvar.sm_spotEnable=0
+
+# 2. Spotlight shadows off, other variants.
+/bo1z/five.html?proxyAlways=1&cvar.r_spotLightShadows=0
+/bo1z/five.html?proxyAlways=1&cvar.r_spotLightSModelShadows=0
+/bo1z/five.html?proxyAlways=1&cvar.r_spotLightEntityShadows=0
+
+# 3. No dynamic lights at all (if the spotlight disappears and the flicker goes, it's the light itself).
+/bo1z/five.html?proxyAlways=1&cvar.r_dlightLimit=0
+
+# 4. Renderer optimizations off one at a time (noArenas already tried: no change).
+/bo1z/five.html?proxyAlways=1&p8upload=0
+/bo1z/five.html?proxyAlways=1&p10retain=0
+/bo1z/five.html?proxyAlways=1&p11precopy=0
+/bo1z/five.html?proxyAlways=1&p14=0
+/bo1z/five.html?proxyAlways=1&p16=0
+/bo1z/five.html?proxyAlways=1&p8state=0
+/bo1z/five.html?proxyAlways=1&groupSkip=0
+# all optimizations off at once:
+/bo1z/five.html?proxyAlways=1&p8upload=0&p10retain=0&p11precopy=0&p14=0&p16=0&p8state=0&p8blocks=0&p8prog=0&groupSkip=0

@@ -1,0 +1,1 @@
+{"name":"bo1z-mp-tools","private":true,"type":"module","dependencies":{"binaryen":"132.0.0","jsqr":"1.4.0","qrcode-generator":"1.4.4"}}

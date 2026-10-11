@@ -1,0 +1,5 @@
+{
+  "signal": "wss://rms.metered.ca/v1",
+  "signalKey": "pk_live_YOUR_METERED_PUBLISHABLE_KEY",
+  "turnApi": "https://YOUR_APP.metered.live/api/v1/turn/credentials?apiKey=YOUR_TURN_API_KEY"
+}

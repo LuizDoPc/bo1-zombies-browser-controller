@@ -1,0 +1,34 @@
+# Updating a deployed bo1z-static/ without re-copying the map packs.
+# The packs (pack/ and <map>/pack/) never change between builds; only the code files outside them do.
+# Replace SERVER and /path/to/bo1z-static with your own.
+
+# Option A: rsync (copies only files that changed; the first run against an existing deploy compares, then is quick)
+rsync -av --checksum --exclude='pack/' static/ SERVER:/path/to/bo1z-static/
+
+# Option B: code-only tarball (bo1z-code.tar.gz, ~33 MB: everything except the packs)
+scp bo1z-code.tar.gz SERVER:
+ssh SERVER 'cd /path/to && tar -xzf ~/bo1z-code.tar.gz'     # unpacks over bo1z-static/, packs untouched
+
+# Rebuilding both after a code change (run in the repository):
+node mp/build.mjs && python3 tools-make-static.py
+tar -cf - --exclude='static/pack' --exclude='static/*/pack' --transform 's,^static,bo1z-static,' static | gzip -9 > bo1z-code.tar.gz
+
+# Offline play (an option in each map's Options, per map, off by default). Turning it on registers sw.js, which keeps the
+# game's code (shared by all maps) plus that map's page, shader lists and loading video on the device; the maps
+# themselves already stay after their download. A map downloaded once then starts with no connection: solo, or co-op
+# on the same Wi-Fi. Turning a map off drops its own files; the last map off removes sw.js and its copy. Devices that
+# had the earlier every-map setting on get it on for each map page they open.
+# Offline co-op has no signaling service: players swap an invite and a reply as QR codes or text (vendor/: qrcode.js and
+# jsQR.js, loaded only then). Nothing to configure on the server: sw.js and vendor/ ship in the tarball, and
+# nginx-coop-coep.conf's headers already cover them. Online behaviour is unchanged whether it's on or off (network first).
+# To retire it for everyone, replace sw.js on the server with this one (each device drops its copy on its next visit):
+#   self.addEventListener('install', () => self.skipWaiting());
+#   self.addEventListener('activate', e => e.waitUntil((async () => {
+#     for (const k of await caches.keys()) if (k.startsWith('bo1z-offline')) await caches.delete(k);
+#     await self.registration.unregister();
+#   })()));
+
+# Lobby services (signaling, TURN) are settings now, not code: net-config.json next to the pages, built from
+# mp/net-config.json (keys: signal, signalKey, turnApi, turn, ntfy; mp/net-config.example.json). The tarball carries
+# your copy, so unpacking it overwrites the one on the server: change mp/net-config.json and rebuild, or edit the server
+# copy after each unpack. Without the file, online lobbies show "This site has no lobby service set up".

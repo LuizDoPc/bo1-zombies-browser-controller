@@ -1,0 +1,42 @@
+# Self-hosted lobby signaling for bo1z co-op (replaces Metered realtime messaging).
+# mp/signal-server.mjs speaks the same protocol subset as Metered, so only the "signal" URL in net-config.json changes.
+# It only relays lobby setup messages; game traffic stays peer to peer. Needs Node 18+.
+
+# 1. Copy the server to your machine
+scp mp/signal-server.mjs SERVER:/opt/bo1z-signal/signal-server.mjs
+
+# 2. /etc/systemd/system/bo1z-signal.service
+[Unit]
+Description=bo1z co-op signaling
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/node /opt/bo1z-signal/signal-server.mjs 8787
+Environment=ORIGINS=https://your.domain
+# optional: hand out your own TURN relay (otherwise pages still fetch TURN credentials from net-config.json's turnApi)
+# Environment=ICE_SERVERS=[{"urls":"turn:YOUR.SERVER.IP:3478","username":"bo1z","credential":"CHANGE_THIS_PASSWORD"}]
+Restart=always
+DynamicUser=yes
+
+[Install]
+WantedBy=multi-user.target
+
+sudo systemctl daemon-reload && sudo systemctl enable --now bo1z-signal
+
+# 3. nginx, in the same server { } block as /bo1z/:
+        location = /bo1z-signal {
+                proxy_pass http://127.0.0.1:8787;
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection "upgrade";
+                proxy_set_header Origin $http_origin;
+                proxy_read_timeout 1h;
+        }
+sudo nginx -t && sudo nginx -s reload
+
+# 4. Try it without changing anything: add &signal=wss://your.domain/bo1z-signal to a lobby link
+#    (everyone in the lobby must use the same signaling server, so share the link with that part included).
+
+# 5. Switch for good: in net-config.json (on the server, next to the pages; or mp/net-config.json, then rebuild) set
+#      "signal": "wss://your.domain/bo1z-signal"
+#    signalKey is then unused and can go.

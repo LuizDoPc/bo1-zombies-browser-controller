@@ -1,0 +1,84 @@
+<!doctype html>
+<!-- pad-test.html: bisect why a controller stops responding on iPad Safari in the game but not on a plain tester.
+     Served from the game's own folder, so it gets the same cross-origin isolation headers (COOP/COEP). Each toggle adds
+     one thing the game does; leave the controller idle for a few minutes and see which one makes it stall. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Controller test</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; padding: 16px; background: #111; color: #ddd; font: 15px/1.5 system-ui, sans-serif; }
+  h1 { font-size: 18px; margin: 0 0 8px; }
+  label { display: block; margin: 6px 0; }
+  pre { background: #000; color: #9f9; padding: 10px; border-radius: 6px; white-space: pre-wrap; font: 13px/1.4 ui-monospace, monospace; }
+  .big { font-size: 22px; font-weight: 600; }
+  .stale { color: #f66; }
+  #log { max-height: 30vh; overflow: auto; }
+</style>
+</head>
+<body>
+<h1>Controller test</h1>
+<p>Press buttons and move the sticks; the panel follows. Then leave the controller untouched for a few minutes, press
+again, and check whether it responds before you touch the screen. Add one toggle at a time.</p>
+<label><input type="checkbox" id="audio"> Audio running (AudioWorklet, silent), like the game</label>
+<label><input type="checkbox" id="wake"> Screen wake lock, like the game</label>
+<label><input type="checkbox" id="busy"> Busy page thread (shared-memory threads polling, like the engine)</label>
+<label><input type="checkbox" id="timer"> Poll on an 8 ms timer as well as per frame, like the game</label>
+<p class="big" id="since">no controller yet: press a button</p>
+<pre id="state"></pre>
+<pre id="log"></pre>
+<script>
+const $ = id => document.getElementById(id);
+const log = text => { $('log').textContent = `${new Date().toLocaleTimeString()} ${text}\n` + $('log').textContent; };
+log(`crossOriginIsolated ${self.crossOriginIsolated}, SharedArrayBuffer ${typeof SharedArrayBuffer}`);
+let lastSig = '', lastChange = 0, lastTouch = 0;
+for (const t of ['pointerdown', 'touchstart']) addEventListener(t, () => { lastTouch = performance.now(); log('screen touched'); }, { capture: true, passive: true });
+for (const t of ['gamepadconnected', 'gamepaddisconnected', 'blur', 'focus', 'visibilitychange'])
+  addEventListener(t, () => log(t + (t === 'visibilitychange' ? ' ' + document.visibilityState : '')));
+function poll() {
+  const now = performance.now(), g = [...(navigator.getGamepads?.() ?? [])].find(p => p && p.connected);
+  if (!g) return;
+  const sig = g.buttons.map(b => b.pressed ? 1 : 0).join('') + Array.from(g.axes, a => a.toFixed(2)).join(',');
+  if (sig !== lastSig) { lastSig = sig; lastChange = now; }
+  $('state').textContent = `${g.id} (${g.mapping})\nbuttons [${g.buttons.map((b, i) => b.pressed ? i : -1).filter(i => i >= 0)}]\naxes ${Array.from(g.axes, a => a.toFixed(2)).join('  ')}\n` +
+    `focus ${document.hasFocus()}  last touch ${lastTouch ? Math.round((now - lastTouch) / 1000) + ' s ago' : 'never'}`;
+  const s = (now - lastChange) / 1000;
+  $('since').textContent = `last controller change ${s.toFixed(1)} s ago`;
+  $('since').className = 'big' + (s > 30 ? ' stale' : '');
+}
+(function frame() { poll(); requestAnimationFrame(frame); })();
+let timer = 0;
+$('timer').onchange = e => { clearInterval(timer); if (e.target.checked) timer = setInterval(poll, 8); log('timer ' + e.target.checked); };
+let ctx = null;
+$('audio').onchange = async e => {
+  if (e.target.checked) {
+    ctx = new AudioContext({ sampleRate: 48000, latencyHint: 'interactive' });
+    const src = `registerProcessor('silent', class extends AudioWorkletProcessor { process(i, o) { return true; } });`;
+    await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+    new AudioWorkletNode(ctx, 'silent', { numberOfInputs: 0, outputChannelCount: [2] }).connect(ctx.destination);
+    await ctx.resume(); log('audio ' + ctx.state);
+  } else { await ctx?.close(); ctx = null; log('audio off'); }
+};
+let lock = null;
+$('wake').onchange = async e => {
+  if (e.target.checked) { try { lock = await navigator.wakeLock.request('screen'); log('wake lock on'); } catch (err) { log('wake lock failed: ' + err.message); e.target.checked = false; } }
+  else { await lock?.release(); lock = null; log('wake lock off'); }
+};
+let workers = [];
+$('busy').onchange = e => {
+  workers.forEach(w => w.terminate()); workers = [];
+  if (!e.target.checked) { log('busy off'); return; }
+  if (typeof SharedArrayBuffer === 'undefined') { log('no SharedArrayBuffer (not cross-origin isolated)'); e.target.checked = false; return; }
+  const sab = new SharedArrayBuffer(16), flags = new Int32Array(sab);
+  const src = `onmessage = e => { const f = new Int32Array(e.data); for (;;) { Atomics.wait(f, 0, 0, 2); Atomics.add(f, 1, 1); } };`;
+  const url = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
+  for (let i = 0; i < 6; i++) { const w = new Worker(url); w.postMessage(sab); workers.push(w); }
+  // the engine's page thread runs proxied calls constantly; keep this thread busy in short slices too
+  (function spin() { if (!workers.length) return; const end = performance.now() + 6; while (performance.now() < end) Atomics.load(flags, 1); setTimeout(spin, 4); })();
+  log('busy on (6 threads + page slices)');
+};
+</script>
+</body>
+</html>

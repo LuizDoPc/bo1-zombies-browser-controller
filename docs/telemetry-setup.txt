@@ -1,0 +1,54 @@
+# Option 1 (simplest): forward to the bo1z machine's serve.py (http://GAME_HOST:8000), which already collects into
+# its telemetry.jsonl. Browsers block an HTTPS page from posting to plain HTTP, so nginx forwards it. Add to the same
+# server { } block as /bo1z/ (an exact-match location wins over the /bo1z/ prefix block):
+        location = /bo1z/telemetry {
+                proxy_pass http://GAME_HOST:8000/bo1z/telemetry;
+                client_max_body_size 300k;
+                proxy_connect_timeout 3s;
+        }
+sudo nginx -t && sudo nginx -s reload
+# Check: should print {"enabled": true, "build": "bo1z-archive"}
+curl -s https://your.domain/bo1z/telemetry
+
+# Option 2: a collector on the web server itself (mp/telemetry-server.py), for when that machine isn't reachable:
+# Telemetry for the deployed site: the page already sends diagnostics to /bo1z/telemetry (crashes with the engine's
+# last log lines, stalls, frame times, audio timing, controller state); nginx just needs to hand them to a collector.
+# Without this, the page's telemetry probe gets a 404 and sends nothing (that's the telemetry 404 in the console).
+
+# 1. Copy the collector and make a secret key (anyone with the key can read the collected log)
+scp mp/telemetry-server.py SERVER:/opt/bo1z-telemetry/telemetry-server.py
+ssh SERVER 'openssl rand -hex 16'          # -> use as TELEMETRY_KEY below
+
+# 2. /etc/systemd/system/bo1z-telemetry.service
+[Unit]
+Description=bo1z telemetry collector
+After=network.target
+
+[Service]
+WorkingDirectory=/var/lib/bo1z-telemetry
+ExecStart=/usr/bin/python3 /opt/bo1z-telemetry/telemetry-server.py 8790 /var/lib/bo1z-telemetry/telemetry.jsonl
+Environment=TELEMETRY_KEY=PUT_THE_KEY_HERE
+StateDirectory=bo1z-telemetry
+DynamicUser=yes
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+
+sudo systemctl daemon-reload && sudo systemctl enable --now bo1z-telemetry
+
+# 3. nginx, in the same server { } block as /bo1z/ (before or after the "location ^~ /bo1z/" block; exact matches win):
+        location = /bo1z/telemetry {
+                proxy_pass http://127.0.0.1:8790/telemetry;
+                client_max_body_size 300k;
+        }
+        location = /bo1z/telemetry.jsonl {
+                proxy_pass http://127.0.0.1:8790/telemetry.jsonl$is_args$args;
+        }
+sudo nginx -t && sudo nginx -s reload
+
+# 4. Check: should print {"enabled": true, "build": "bo1z-static"}
+curl -s https://your.domain/bo1z/telemetry
+
+# 5. Reading it (or give me the key and I'll read it):
+curl -s "https://your.domain/bo1z/telemetry.jsonl?key=PUT_THE_KEY_HERE" | tail

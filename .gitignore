@@ -1,0 +1,11 @@
+# the site this builds on (a copy of https://vel.gg/bo1z: upstream's code plus the game's data packs) and build output
+/site/
+/overlay/
+/static/
+*.tar.gz
+# the deployer's own settings and art
+/mp/net-config.json
+/mp/icons/
+/mp/node_modules/
+telemetry.jsonl
+__pycache__/
